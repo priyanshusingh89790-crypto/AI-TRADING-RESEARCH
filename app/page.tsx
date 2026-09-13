@@ -1,69 +1,185 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import type {
+  ResearchAnalysis,
+  Experiment,
+  BacktestResult,
+  ResearchConclusion,
+} from "@/src/types/experiment";
+import { StepIndicator } from "@/src/components/StepIndicator";
+import { AskSection } from "@/src/components/AskSection";
+import { ClarifySection } from "@/src/components/ClarifySection";
+import { DefineSection } from "@/src/components/DefineSection";
+import { ResultsSection } from "@/src/components/ResultsSection";
+import { LearnSection } from "@/src/components/LearnSection";
+
+type Step = "ask" | "clarify" | "define" | "test" | "learn";
+
+export default function HomePage() {
+  const [step, setStep] = useState<Step>("ask");
+  const [question, setQuestion] = useState("");
+  const [analysis, setAnalysis] = useState<ResearchAnalysis | null>(null);
+  const [experiment, setExperiment] = useState<Experiment | null>(null);
+  const [backtestResults, setBacktestResults] = useState<BacktestResult | null>(null);
+  const [conclusion, setConclusion] = useState<ResearchConclusion | null>(null);
+
+  function handleAnalysisComplete(rawAnalysis: unknown, q: string) {
+    setQuestion(q);
+    setAnalysis(rawAnalysis as ResearchAnalysis);
+    setExperiment(null);
+    setBacktestResults(null);
+    setConclusion(null);
+    setStep("clarify");
+  }
+
+  function handleExperimentBuilt(rawExperiment: unknown) {
+    setExperiment(rawExperiment as Experiment);
+    setBacktestResults(null);
+    setConclusion(null);
+    setStep("define");
+  }
+
+  function handleBacktestComplete(rawResults: unknown) {
+    setBacktestResults(rawResults as BacktestResult);
+    setStep("test");
+  }
+
+  function handleConclusionReady(rawConclusion: ResearchConclusion) {
+    setConclusion(rawConclusion);
+    setStep("learn");
+  }
+
+  function handleNewQuestion(q: string) {
+    // Pre-fill and reset to ask step
+    setQuestion(q);
+    setAnalysis(null);
+    setExperiment(null);
+    setBacktestResults(null);
+    setConclusion(null);
+    setStep("ask");
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleReset() {
+    setQuestion("");
+    setAnalysis(null);
+    setExperiment(null);
+    setBacktestResults(null);
+    setConclusion(null);
+    setStep("ask");
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <header className="border-b border-zinc-200 bg-white sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          <StepIndicator currentStep={step} />
+          {step !== "ask" && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors
+                focus:outline-none focus:ring-2 focus:ring-zinc-300 rounded px-2 py-1"
+            >
+              Start over
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-10">
+        {/* Step 1: Ask */}
+        <AskSection
+          key={question} // re-mount when new question from Learn
+          initialQuestion={question}
+          onAnalysisComplete={handleAnalysisComplete}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+        {/* Step 2: Clarify */}
+        {analysis && (step === "clarify" || step === "define" || step === "test" || step === "learn") && (
+          <div className="border-t border-zinc-100 pt-8">
+            {step === "clarify" ? (
+              <ClarifySection
+                question={question}
+                analysis={analysis}
+                onExperimentBuilt={handleExperimentBuilt}
+              />
+            ) : (
+              <div className="opacity-50 pointer-events-none">
+                <CollapsedStep label="Clarify" summary={question} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 3: Define */}
+        {experiment && (step === "define" || step === "test" || step === "learn") && (
+          <div className="border-t border-zinc-100 pt-8">
+            {step === "define" ? (
+              <DefineSection
+                experiment={experiment}
+                onRunBacktest={handleBacktestComplete}
+              />
+            ) : (
+              <div className="opacity-50 pointer-events-none">
+                <CollapsedStep
+                  label="Define"
+                  summary={`${experiment.instrument} · ${experiment.entry.condition} · ${experiment.holdingPeriod.value} ${experiment.holdingPeriod.unit}`}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 4: Test / Results */}
+        {backtestResults && experiment && (step === "test" || step === "learn") && (
+          <div className="border-t border-zinc-100 pt-8">
+            <ResultsSection
+              results={backtestResults}
+              experiment={experiment}
+              onConclusionReady={handleConclusionReady}
+            />
+          </div>
+        )}
+
+        {/* Step 5: Learn */}
+        {conclusion && step === "learn" && (
+          <div className="border-t border-zinc-100 pt-8">
+            <LearnSection
+              conclusion={conclusion}
+              onNewQuestion={handleNewQuestion}
+            />
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-zinc-100 mt-16">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
+          <p className="text-xs text-zinc-400">
+            AI Trading Research Assistant · Internship prototype ·{" "}
+            <span className="text-amber-600">
+              Uses synthetic demo data, not real market data
+            </span>
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </footer>
+    </div>
+  );
+}
+
+function CollapsedStep({ label, summary }: { label: string; summary: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider w-16">
+        {label}
+      </span>
+      <span className="text-sm text-zinc-400 truncate">{summary}</span>
+      <span className="text-zinc-300 ml-auto text-sm">✓</span>
     </div>
   );
 }
